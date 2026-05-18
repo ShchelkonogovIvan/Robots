@@ -3,6 +3,14 @@ package gui;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.beans.PropertyVetoException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Properties;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
@@ -25,7 +33,11 @@ import log.Logger;
  */
 public class MainApplicationFrame extends JFrame
 {
+    private static final String WINDOW_STATE_FILE_NAME = "window-state.properties";
+
     private final JDesktopPane desktopPane = new JDesktopPane();
+    private LogWindow logWindow;
+    private GameWindow gameWindow;
     
     public MainApplicationFrame() {
         //Make the big window be indented 50 pixels from each edge
@@ -39,15 +51,25 @@ public class MainApplicationFrame extends JFrame
         setContentPane(desktopPane);
         
         
-        LogWindow logWindow = createLogWindow();
+        logWindow = createLogWindow();
         addWindow(logWindow);
 
-        GameWindow gameWindow = new GameWindow();
+        gameWindow = new GameWindow();
         gameWindow.setSize(400,  400);
         addWindow(gameWindow);
 
         setJMenuBar(generateMenuBar());
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        addWindowListener(new WindowAdapter()
+        {
+            @Override
+            public void windowClosing(WindowEvent event)
+            {
+                onExit();
+            }
+        });
+
+        restoreWindowState();
     }
     
     protected LogWindow createLogWindow()
@@ -166,8 +188,129 @@ public class MainApplicationFrame extends JFrame
 
         if (result == JOptionPane.YES_OPTION)
         {
+            saveWindowState();
             System.exit(0);
         }
+    }
+
+    private File getWindowStateFile()
+    {
+        return new File(System.getProperty("user.home"), WINDOW_STATE_FILE_NAME);
+    }
+
+    private void saveWindowState()
+    {
+        Properties properties = new Properties();
+        saveFrameState(properties, "main", this);
+        saveInternalFrameState(properties, "logWindow", logWindow);
+        saveInternalFrameState(properties, "gameWindow", gameWindow);
+
+        try (FileOutputStream stream = new FileOutputStream(getWindowStateFile()))
+        {
+            properties.store(stream, "Statement");
+        }
+        catch (IOException e)
+        {
+            Logger.error("Не удалось сохранить состояние окон");
+        }
+    }
+
+    private boolean restoreWindowState()
+    {
+        File stateFile = getWindowStateFile();
+        if (!stateFile.exists())
+        {
+            return false;
+        }
+
+        Properties properties = new Properties();
+        try (FileInputStream stream = new FileInputStream(stateFile))
+        {
+            properties.load(stream);
+            restoreFrameState(properties, "main", this);
+            restoreInternalFrameState(properties, "logWindow", logWindow);
+            restoreInternalFrameState(properties, "gameWindow", gameWindow);
+            return true;
+        }
+        catch (IOException e)
+        {
+            Logger.error("Не удалось восстановить состояние окон");
+            return false;
+        }
+    }
+
+    private void saveFrameState(Properties properties, String prefix, JFrame frame)
+    {
+        properties.setProperty(prefix + ".x", Integer.toString(frame.getX()));
+        properties.setProperty(prefix + ".y", Integer.toString(frame.getY()));
+        properties.setProperty(prefix + ".width", Integer.toString(frame.getWidth()));
+        properties.setProperty(prefix + ".height", Integer.toString(frame.getHeight()));
+        properties.setProperty(prefix + ".extendedState", Integer.toString(frame.getExtendedState()));
+    }
+
+    private void restoreFrameState(Properties properties, String prefix, JFrame frame)
+    {
+        frame.setBounds(
+                getIntProperty(properties, prefix + ".x", frame.getX()),
+                getIntProperty(properties, prefix + ".y", frame.getY()),
+                getIntProperty(properties, prefix + ".width", frame.getWidth()),
+                getIntProperty(properties, prefix + ".height", frame.getHeight()));
+        frame.setExtendedState(getIntProperty(properties, prefix + ".extendedState", frame.getExtendedState()));
+    }
+
+    private void saveInternalFrameState(Properties properties, String prefix, JInternalFrame frame)
+    {
+        properties.setProperty(prefix + ".x", Integer.toString(frame.getX()));
+        properties.setProperty(prefix + ".y", Integer.toString(frame.getY()));
+        properties.setProperty(prefix + ".width", Integer.toString(frame.getWidth()));
+        properties.setProperty(prefix + ".height", Integer.toString(frame.getHeight()));
+        properties.setProperty(prefix + ".icon", Boolean.toString(frame.isIcon()));
+        properties.setProperty(prefix + ".maximum", Boolean.toString(frame.isMaximum()));
+    }
+
+    private void restoreInternalFrameState(Properties properties, String prefix, JInternalFrame frame)
+    {
+        frame.setBounds(
+                getIntProperty(properties, prefix + ".x", frame.getX()),
+                getIntProperty(properties, prefix + ".y", frame.getY()),
+                getIntProperty(properties, prefix + ".width", frame.getWidth()),
+                getIntProperty(properties, prefix + ".height", frame.getHeight()));
+        try
+        {
+            frame.setIcon(getBooleanProperty(properties, prefix + ".icon", frame.isIcon()));
+            frame.setMaximum(getBooleanProperty(properties, prefix + ".maximum", frame.isMaximum()));
+        }
+        catch (PropertyVetoException e)
+        {
+            Logger.error("Не удалось восстановить состояние внутреннего окна");
+        }
+    }
+
+    private int getIntProperty(Properties properties, String name, int defaultValue)
+    {
+        String value = properties.getProperty(name);
+        if (value == null)
+        {
+            return defaultValue;
+        }
+        try
+        {
+            return Integer.parseInt(value);
+        }
+        catch (NumberFormatException e)
+        {
+            return defaultValue;
+        }
+    }
+
+    private boolean getBooleanProperty(Properties properties, String name, boolean defaultValue)
+    {
+        String value = properties.getProperty(name);
+        if (value == null)
+        {
+            return defaultValue;
+        }
+        return Boolean.parseBoolean(value);
     }
     
     private void setLookAndFeel(String className)
