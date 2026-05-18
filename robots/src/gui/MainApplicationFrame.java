@@ -10,6 +10,7 @@ import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -98,6 +99,19 @@ public class MainApplicationFrame extends JFrame
     private JMenuBar generateMenuBar()
     {
         JMenuBar menuBar = new JMenuBar();
+
+        JMenu applicationMenu = new JMenu("Приложение");
+        applicationMenu.setMnemonic(KeyEvent.VK_A);
+        applicationMenu.getAccessibleContext().setAccessibleDescription(
+                "Управление приложением");
+
+        {
+            JMenuItem exitItem = new JMenuItem("Выход", KeyEvent.VK_Q);
+            exitItem.addActionListener((event) -> {
+                onExit();
+            });
+            applicationMenu.add(exitItem);
+        }
         
         JMenu lookAndFeelMenu = new JMenu("Режим отображения");
         lookAndFeelMenu.setMnemonic(KeyEvent.VK_V);
@@ -135,9 +149,25 @@ public class MainApplicationFrame extends JFrame
             testMenu.add(addLogMessageItem);
         }
 
+        menuBar.add(applicationMenu);
         menuBar.add(lookAndFeelMenu);
         menuBar.add(testMenu);
         return menuBar;
+    }
+// Метод для для выхода из приложения
+    private void onExit()
+    {
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                "Вы действительно хотите выйти?",
+                "Подтверждение выхода",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+        if (result == JOptionPane.YES_OPTION)
+        {
+            System.exit(0);
+        }
     }
     
     private void setLookAndFeel(String className)
@@ -145,6 +175,7 @@ public class MainApplicationFrame extends JFrame
         try
         {
             UIManager.setLookAndFeel(className);
+            GuiLocalization.apply();
             SwingUtilities.updateComponentTreeUI(this);
         }
         catch (ClassNotFoundException | InstantiationException

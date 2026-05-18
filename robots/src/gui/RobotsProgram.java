@@ -8,6 +8,7 @@ import javax.swing.UIManager;
 public class RobotsProgram
 {
     public static void main(String[] args) {
+      GuiLocalization.apply();
       try {
         UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
 //        UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel");
@@ -16,6 +17,7 @@ public class RobotsProgram
       } catch (Exception e) {
         e.printStackTrace();
       }
+      GuiLocalization.apply();
       SwingUtilities.invokeLater(() -> {
         MainApplicationFrame frame = new MainApplicationFrame();
         frame.pack();
