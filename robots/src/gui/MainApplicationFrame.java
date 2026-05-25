@@ -5,12 +5,8 @@ import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.beans.PropertyVetoException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Properties;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
@@ -33,29 +29,47 @@ import log.Logger;
  */
 public class MainApplicationFrame extends JFrame
 {
-    private static final String WINDOW_STATE_FILE_NAME = "window-state.properties";
+    private static final int SCREEN_INSET = 50;
+    private static final int GAME_WINDOW_WIDTH = 400;
+    private static final int GAME_WINDOW_HEIGHT = 400;
+    private static final int LOG_WINDOW_X = 10;
+    private static final int LOG_WINDOW_Y = 10;
+    private static final int LOG_WINDOW_WIDTH = 300;
+    private static final int LOG_WINDOW_HEIGHT = 800;
+
+    private static final String APPLICATION_MENU_TEXT = "Приложение";
+    private static final String APPLICATION_MENU_DESCRIPTION = "Управление приложением";
+    private static final String EXIT_MENU_TEXT = "Выход";
+    private static final String LOOK_AND_FEEL_MENU_TEXT = "Режим отображения";
+    private static final String LOOK_AND_FEEL_MENU_DESCRIPTION = "Управление режимом отображения приложения";
+    private static final String SYSTEM_LOOK_AND_FEEL_TEXT = "Системная схема";
+    private static final String CROSS_PLATFORM_LOOK_AND_FEEL_TEXT = "Универсальная схема";
+    private static final String TEST_MENU_TEXT = "Тесты";
+    private static final String TEST_MENU_DESCRIPTION = "Тестовые команды";
+    private static final String ADD_LOG_MESSAGE_TEXT = "Сообщение в лог";
+    private static final String EXIT_CONFIRMATION_MESSAGE = "Вы действительно хотите выйти?";
+    private static final String EXIT_CONFIRMATION_TITLE = "Подтверждение выхода";
 
     private final JDesktopPane desktopPane = new JDesktopPane();
-    private LogWindow logWindow;
-    private GameWindow gameWindow;
+    private final WindowStateManager windowStateManager = new WindowStateManager(this, desktopPane);
+    private final Map<Class<? extends JInternalFrame>, Integer> internalFrameCounters = new HashMap<>();
     
     public MainApplicationFrame() {
         //Make the big window be indented 50 pixels from each edge
         //of the screen.
-        int inset = 50;        
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setBounds(inset, inset,
-            screenSize.width  - inset*2,
-            screenSize.height - inset*2);
+        setBounds(SCREEN_INSET, SCREEN_INSET,
+            screenSize.width  - SCREEN_INSET * 2,
+            screenSize.height - SCREEN_INSET * 2);
 
         setContentPane(desktopPane);
         
         
-        logWindow = createLogWindow();
+        LogWindow logWindow = createLogWindow();
         addWindow(logWindow);
 
-        gameWindow = new GameWindow();
-        gameWindow.setSize(400,  400);
+        GameWindow gameWindow = new GameWindow();
+        gameWindow.setSize(GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT);
         addWindow(gameWindow);
 
         setJMenuBar(generateMenuBar());
@@ -69,14 +83,14 @@ public class MainApplicationFrame extends JFrame
             }
         });
 
-        restoreWindowState();
+        windowStateManager.restore();
     }
     
     protected LogWindow createLogWindow()
     {
         LogWindow logWindow = new LogWindow(Logger.getDefaultLogSource());
-        logWindow.setLocation(10,10);
-        logWindow.setSize(300, 800);
+        logWindow.setLocation(LOG_WINDOW_X, LOG_WINDOW_Y);
+        logWindow.setSize(LOG_WINDOW_WIDTH, LOG_WINDOW_HEIGHT);
         setMinimumSize(logWindow.getSize());
         logWindow.pack();
         Logger.debug("Протокол работает");
@@ -85,8 +99,18 @@ public class MainApplicationFrame extends JFrame
     
     protected void addWindow(JInternalFrame frame)
     {
+        registerInternalFrame(frame);
         desktopPane.add(frame);
         frame.setVisible(true);
+    }
+
+    private void registerInternalFrame(JInternalFrame frame)
+    {
+        Class<? extends JInternalFrame> frameClass = frame.getClass();
+        int frameNumber = internalFrameCounters.getOrDefault(frameClass, 0);
+        internalFrameCounters.put(frameClass, frameNumber + 1);
+        frame.putClientProperty(WindowStateManager.WINDOW_STATE_KEY_PROPERTY,
+                frameClass.getSimpleName() + "." + frameNumber);
     }
     
 //    protected JMenuBar createMenuBar() {
@@ -122,26 +146,26 @@ public class MainApplicationFrame extends JFrame
     {
         JMenuBar menuBar = new JMenuBar();
 
-        JMenu applicationMenu = new JMenu("Приложение");
+        JMenu applicationMenu = new JMenu(APPLICATION_MENU_TEXT);
         applicationMenu.setMnemonic(KeyEvent.VK_A);
         applicationMenu.getAccessibleContext().setAccessibleDescription(
-                "Управление приложением");
+                APPLICATION_MENU_DESCRIPTION);
 
         {
-            JMenuItem exitItem = new JMenuItem("Выход", KeyEvent.VK_Q);
+            JMenuItem exitItem = new JMenuItem(EXIT_MENU_TEXT, KeyEvent.VK_Q);
             exitItem.addActionListener((event) -> {
                 onExit();
             });
             applicationMenu.add(exitItem);
         }
         
-        JMenu lookAndFeelMenu = new JMenu("Режим отображения");
+        JMenu lookAndFeelMenu = new JMenu(LOOK_AND_FEEL_MENU_TEXT);
         lookAndFeelMenu.setMnemonic(KeyEvent.VK_V);
         lookAndFeelMenu.getAccessibleContext().setAccessibleDescription(
-                "Управление режимом отображения приложения");
+                LOOK_AND_FEEL_MENU_DESCRIPTION);
         
         {
-            JMenuItem systemLookAndFeel = new JMenuItem("Системная схема", KeyEvent.VK_S);
+            JMenuItem systemLookAndFeel = new JMenuItem(SYSTEM_LOOK_AND_FEEL_TEXT, KeyEvent.VK_S);
             systemLookAndFeel.addActionListener((event) -> {
                 setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
                 this.invalidate();
@@ -150,7 +174,7 @@ public class MainApplicationFrame extends JFrame
         }
 
         {
-            JMenuItem crossplatformLookAndFeel = new JMenuItem("Универсальная схема", KeyEvent.VK_S);
+            JMenuItem crossplatformLookAndFeel = new JMenuItem(CROSS_PLATFORM_LOOK_AND_FEEL_TEXT, KeyEvent.VK_S);
             crossplatformLookAndFeel.addActionListener((event) -> {
                 setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
                 this.invalidate();
@@ -158,13 +182,13 @@ public class MainApplicationFrame extends JFrame
             lookAndFeelMenu.add(crossplatformLookAndFeel);
         }
 
-        JMenu testMenu = new JMenu("Тесты");
+        JMenu testMenu = new JMenu(TEST_MENU_TEXT);
         testMenu.setMnemonic(KeyEvent.VK_T);
         testMenu.getAccessibleContext().setAccessibleDescription(
-                "Тестовые команды");
+                TEST_MENU_DESCRIPTION);
         
         {
-            JMenuItem addLogMessageItem = new JMenuItem("Сообщение в лог", KeyEvent.VK_S);
+            JMenuItem addLogMessageItem = new JMenuItem(ADD_LOG_MESSAGE_TEXT, KeyEvent.VK_S);
             addLogMessageItem.addActionListener((event) -> {
                 Logger.debug("Новая строка");
             });
@@ -181,136 +205,16 @@ public class MainApplicationFrame extends JFrame
     {
         int result = JOptionPane.showConfirmDialog(
                 this,
-                "Вы действительно хотите выйти?",
-                "Подтверждение выхода",
+                EXIT_CONFIRMATION_MESSAGE,
+                EXIT_CONFIRMATION_TITLE,
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE);
 
         if (result == JOptionPane.YES_OPTION)
         {
-            saveWindowState();
+            windowStateManager.save();
             System.exit(0);
         }
-    }
-
-    private File getWindowStateFile()
-    {
-        return new File(System.getProperty("user.home"), WINDOW_STATE_FILE_NAME);
-    }
-
-    private void saveWindowState()
-    {
-        Properties properties = new Properties();
-        saveFrameState(properties, "main", this);
-        saveInternalFrameState(properties, "logWindow", logWindow);
-        saveInternalFrameState(properties, "gameWindow", gameWindow);
-
-        try (FileOutputStream stream = new FileOutputStream(getWindowStateFile()))
-        {
-            properties.store(stream, "Statement");
-        }
-        catch (IOException e)
-        {
-            Logger.error("Не удалось сохранить состояние окон");
-        }
-    }
-
-    private boolean restoreWindowState()
-    {
-        File stateFile = getWindowStateFile();
-        if (!stateFile.exists())
-        {
-            return false;
-        }
-
-        Properties properties = new Properties();
-        try (FileInputStream stream = new FileInputStream(stateFile))
-        {
-            properties.load(stream);
-            restoreFrameState(properties, "main", this);
-            restoreInternalFrameState(properties, "logWindow", logWindow);
-            restoreInternalFrameState(properties, "gameWindow", gameWindow);
-            return true;
-        }
-        catch (IOException e)
-        {
-            Logger.error("Не удалось восстановить состояние окон");
-            return false;
-        }
-    }
-
-    private void saveFrameState(Properties properties, String prefix, JFrame frame)
-    {
-        properties.setProperty(prefix + ".x", Integer.toString(frame.getX()));
-        properties.setProperty(prefix + ".y", Integer.toString(frame.getY()));
-        properties.setProperty(prefix + ".width", Integer.toString(frame.getWidth()));
-        properties.setProperty(prefix + ".height", Integer.toString(frame.getHeight()));
-        properties.setProperty(prefix + ".extendedState", Integer.toString(frame.getExtendedState()));
-    }
-
-    private void restoreFrameState(Properties properties, String prefix, JFrame frame)
-    {
-        frame.setBounds(
-                getIntProperty(properties, prefix + ".x", frame.getX()),
-                getIntProperty(properties, prefix + ".y", frame.getY()),
-                getIntProperty(properties, prefix + ".width", frame.getWidth()),
-                getIntProperty(properties, prefix + ".height", frame.getHeight()));
-        frame.setExtendedState(getIntProperty(properties, prefix + ".extendedState", frame.getExtendedState()));
-    }
-
-    private void saveInternalFrameState(Properties properties, String prefix, JInternalFrame frame)
-    {
-        properties.setProperty(prefix + ".x", Integer.toString(frame.getX()));
-        properties.setProperty(prefix + ".y", Integer.toString(frame.getY()));
-        properties.setProperty(prefix + ".width", Integer.toString(frame.getWidth()));
-        properties.setProperty(prefix + ".height", Integer.toString(frame.getHeight()));
-        properties.setProperty(prefix + ".icon", Boolean.toString(frame.isIcon()));
-        properties.setProperty(prefix + ".maximum", Boolean.toString(frame.isMaximum()));
-    }
-
-    private void restoreInternalFrameState(Properties properties, String prefix, JInternalFrame frame)
-    {
-        frame.setBounds(
-                getIntProperty(properties, prefix + ".x", frame.getX()),
-                getIntProperty(properties, prefix + ".y", frame.getY()),
-                getIntProperty(properties, prefix + ".width", frame.getWidth()),
-                getIntProperty(properties, prefix + ".height", frame.getHeight()));
-        try
-        {
-            frame.setIcon(getBooleanProperty(properties, prefix + ".icon", frame.isIcon()));
-            frame.setMaximum(getBooleanProperty(properties, prefix + ".maximum", frame.isMaximum()));
-        }
-        catch (PropertyVetoException e)
-        {
-            Logger.error("Не удалось восстановить состояние внутреннего окна");
-        }
-    }
-
-    private int getIntProperty(Properties properties, String name, int defaultValue)
-    {
-        String value = properties.getProperty(name);
-        if (value == null)
-        {
-            return defaultValue;
-        }
-        try
-        {
-            return Integer.parseInt(value);
-        }
-        catch (NumberFormatException e)
-        {
-            return defaultValue;
-        }
-    }
-
-    private boolean getBooleanProperty(Properties properties, String name, boolean defaultValue)
-    {
-        String value = properties.getProperty(name);
-        if (value == null)
-        {
-            return defaultValue;
-        }
-        return Boolean.parseBoolean(value);
     }
     
     private void setLookAndFeel(String className)
