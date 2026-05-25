@@ -53,6 +53,9 @@ public class MainApplicationFrame extends JFrame
     private final JDesktopPane desktopPane = new JDesktopPane();
     private final WindowStateManager windowStateManager = new WindowStateManager(this, desktopPane);
     private final Map<Class<? extends JInternalFrame>, Integer> internalFrameCounters = new HashMap<>();
+    private final RobotModel robotModel = new RobotModel();
+    private final RobotController robotController = new RobotController(robotModel);
+    private RobotCoordinatesPresenter robotCoordinatesPresenter;
     
     public MainApplicationFrame() {
         //Make the big window be indented 50 pixels from each edge
@@ -68,9 +71,15 @@ public class MainApplicationFrame extends JFrame
         LogWindow logWindow = createLogWindow();
         addWindow(logWindow);
 
-        GameWindow gameWindow = new GameWindow();
+        GameWindow gameWindow = new GameWindow(robotModel, robotController);
         gameWindow.setSize(GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT);
         addWindow(gameWindow);
+
+        RobotCoordinatesWindow coordinatesWindow = new RobotCoordinatesWindow();
+        robotCoordinatesPresenter = new RobotCoordinatesPresenter(robotModel, coordinatesWindow);
+        coordinatesWindow.setLocation(GAME_WINDOW_WIDTH + 20, 10);
+        addWindow(coordinatesWindow);
+        robotController.start();
 
         setJMenuBar(generateMenuBar());
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
@@ -231,4 +240,5 @@ public class MainApplicationFrame extends JFrame
             // just ignore
         }
     }
+
 }
